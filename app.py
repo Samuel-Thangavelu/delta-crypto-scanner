@@ -20,7 +20,9 @@ st.markdown("""
         max-width: 1500px;
     }
     h1 { font-size: clamp(1.55rem, 4vw, 2.35rem) !important; }
-    [data-testid="stDataFrame"] { width: 100%; }
+    [data-testid="stDataFrame"] { width: fit-content; max-width: 100%; }
+    [data-testid="stDataFrame"] div[role="gridcell"],
+    [data-testid="stDataFrame"] div[role="columnheader"] { padding-left: 0.35rem; padding-right: 0.35rem; }
     [data-testid="stMetric"] {
         padding: 0.65rem 0.75rem;
         border: 1px solid rgba(128,128,128,0.18);
@@ -257,18 +259,23 @@ with st.spinner("Scanning 28 symbols using public Delta Exchange candle data…"
 
         styled = shown[cols].round(4).style.apply(color_signal, axis=1)
         column_config = {
-            "S.No": st.column_config.NumberColumn("S.No", width="small", help="Serial number"),
-            "Symbol": st.column_config.TextColumn("Symbol", width="small"),
-            "Candle UTC": st.column_config.TextColumn("Candle UTC", width="medium"),
-            "Signal": st.column_config.TextColumn("Signal", width="medium"),
+            "S.No": st.column_config.NumberColumn("S.No", width=52, help="Serial number"),
+            "Symbol": st.column_config.TextColumn("Symbol", width=100),
+            "Candle UTC": st.column_config.TextColumn("Candle UTC", width=150),
+            "Signal": st.column_config.TextColumn("Signal", width=150),
         }
-        # Center-align serial numbers and keep that column narrow.
-        styled = styled.set_properties(subset=["S.No"], **{"text-align": "center"})
+        # Compact, content-sized columns; center the serial number within its narrow column.
+        styled = styled.set_properties(subset=["S.No"], **{
+            "text-align": "center",
+            "padding-left": "0px",
+            "padding-right": "0px",
+        })
         st.dataframe(
             styled,
-            use_container_width=True,
+            use_container_width=False,
             hide_index=True,
-            column_config=column_config
+            column_config=column_config,
+            height=min(680, 36 * (len(shown) + 1) + 8)
         )
 
         if fetch_errors:
