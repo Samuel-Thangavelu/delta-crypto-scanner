@@ -168,7 +168,7 @@ def run_scan():
             bull = close > P and e9 > e21 and 0 < bp <= 5
             bear = close < P and e9 < e21 and 0 < sp <= 5
             entries.append({
-                "Symbol": symbol, "Candle UTC": common.strftime("%Y-%m-%d %H:%M"),
+                "Symbol": symbol, "Candle UTC": common.strftime("%d-%m-%y %H:%M"),
                 "Pivot Source Date": pv["Pivot Source Date"], "Close": close,
                 "EMA9": e9, "EMA21": e21, "Pivot": P,
                 "R1": pv["R1"], "R2": pv["R2"], "R3": pv["R3"], "R4": R4, "R5": pv["R5"],
@@ -256,7 +256,20 @@ with st.spinner("Scanning 28 symbols using public Delta Exchange candle data…"
             return [""] * len(row)
 
         styled = shown[cols].round(4).style.apply(color_signal, axis=1)
-        st.dataframe(styled, use_container_width=True, hide_index=True)
+        column_config = {
+            "S.No": st.column_config.NumberColumn("S.No", width="small", help="Serial number"),
+            "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+            "Candle UTC": st.column_config.TextColumn("Candle UTC", width="medium"),
+            "Signal": st.column_config.TextColumn("Signal", width="medium"),
+        }
+        # Center-align serial numbers and keep that column narrow.
+        styled = styled.set_properties(subset=["S.No"], **{"text-align": "center"})
+        st.dataframe(
+            styled,
+            use_container_width=True,
+            hide_index=True,
+            column_config=column_config
+        )
 
         if fetch_errors:
             with st.expander(f"Data fetch errors ({len(fetch_errors)})"):
