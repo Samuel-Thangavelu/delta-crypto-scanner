@@ -35,7 +35,15 @@ def pivots(previous):
     H,L,C=float(previous.high),float(previous.low),float(previous.close)
     if not H>L: raise ValueError("Invalid daily candle high/low")
     P=(H+L+C)/3; rng=H-L
-    return {"Pivot":P,"R4":3*P+(H-3*L),"S4":3*P-(3*H-L),"Pivot Source Date":previous.time.strftime("%Y-%m-%d")}
+    R1 = 2*P-L; S1 = 2*P-H
+    R2 = P+(H-L); S2 = P-(H-L)
+    R3 = H+2*(P-L); S3 = L-2*(H-P)
+    # Preserve the scanner's already-validated R4/S4 formulas used by entry percentages.
+    R4 = 3*P+(H-3*L); S4 = 3*P-(3*H-L)
+    R5 = R4+(H-L); S5 = S4-(H-L)
+    return {"Pivot":P,"R1":R1,"R2":R2,"R3":R3,"R4":R4,"R5":R5,
+            "S1":S1,"S2":S2,"S3":S3,"S4":S4,"S5":S5,
+            "Pivot Source Date":previous.time.strftime("%Y-%m-%d")}
 
 @st.cache_data(ttl=840, show_spinner=False)
 def run_scan():
@@ -79,7 +87,7 @@ def run_scan():
             last=row.iloc[-1]; close=float(last.close); e9=float(last.EMA9); e21=float(last.EMA21); P=pv["Pivot"]; R4=pv["R4"]; S4=pv["S4"]
             bp=(close-P)/(R4-P)*100 if R4!=P else np.nan; sp=(P-close)/(P-S4)*100 if P!=S4 else np.nan
             bull=close>P and e9>e21 and 0<bp<=5; bear=close<P and e9<e21 and 0<sp<=5
-            entries.append({"Symbol":s,"Candle UTC":common,"Pivot Source Date":pv["Pivot Source Date"],"Close":close,"EMA9":e9,"EMA21":e21,"Pivot":P,"R4":R4,"S4":S4,"Bullish %":bp,"Bearish %":sp,"Signal":"BULLISH EARLY" if bull else ("BEARISH EARLY" if bear else "NO SETUP")})
+            entries.append({"Symbol":s,"Candle UTC":common,"Pivot Source Date":pv["Pivot Source Date"],"Close":close,"EMA9":e9,"EMA21":e21,"Pivot":P,"R1":pv["R1"],"R2":pv["R2"],"R3":pv["R3"],"R4":R4,"R5":pv["R5"],"S1":pv["S1"],"S2":pv["S2"],"S3":pv["S3"],"S4":S4,"S5":pv["S5"],"Bullish %":bp,"Bearish %":sp,"Signal":"BULLISH EARLY" if bull else ("BEARISH EARLY" if bear else "NO SETUP")})
         except Exception as exc: scan_errors.append({"Symbol":s,"Error":str(exc)})
     df=pd.DataFrame(entries)
     if df.empty: raise RuntimeError("No entry results could be calculated.")
@@ -109,8 +117,24 @@ with st.spinner("Scanning 28 symbols using public Delta Exchange candle data…"
         shown=dashboard
         if mode=="Priority only": shown=dashboard[dashboard.Priority=="PRIORITY"]
         elif mode=="Entry signals": shown=dashboard[dashboard.Signal!="NO SETUP"]
-        cols=["Symbol","Candle UTC","Close","EMA9","EMA21","Pivot","R4","S4","Bullish %","Bearish %","Signal",*RS_COLS,"Positive Strength Count","Strength Category","RS Aligned","Priority"]
-        st.dataframe(shown[cols].round(4),use_container_width=True,hide_index=True)
+        show_rs = st.checkbox("Show Relative Strength details", value=False)
+        shown = shown.copy().reset_index(drop=True)
+        shown.insert(0, "S.No", range(1, len(shown) + 1))
+        cols=["S.No","Symbol","Candle UTC","Close","EMA9","EMA21","Pivot",
+              "R1","R2","R3","R4","R5","S1","S2","S3","S4","S5",
+              "Bullish %","Bearish %","Signal"]
+        if show_rs:
+            cols += [*RS_COLS,"Positive Strength Count","Strength Category","RS Aligned"]
+        cols += ["Priority"]
+        def color_signal(row):
+            signal = str(row.get("Signal", ""))
+            if signal in ("BULLISH EARLY", "BEARISH EARLY"):
+                return ["background-color: #d9f2df; color: #14532d"] * len(row)
+            if signal == "NO SETUP":
+                return ["background-color: #eeeeee; color: #555555"] * len(row)
+            return [""] * len(row)
+        styled = shown[cols].round(4).style.apply(color_signal, axis=1)
+        st.dataframe(styled, use_container_width=True, hide_index=True)
         st.subheader("Signal counts")
         st.dataframe(dashboard.groupby(["Signal","Priority"]).size().reset_index(name="Count"),use_container_width=True,hide_index=True)
         if fetch_errors:
