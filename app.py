@@ -83,6 +83,8 @@ def run_scan():
         except Exception as exc: scan_errors.append({"Symbol":s,"Error":str(exc)})
     df=pd.DataFrame(entries)
     if df.empty: raise RuntimeError("No entry results could be calculated.")
+    # The entry table already contains Close; drop the duplicate Close from RS data before merging.
+    strength = strength.drop(columns=["Close"], errors="ignore")
     df=df.merge(strength,on="Symbol",how="left")
     df["RS Aligned"]=(((df.Signal=="BULLISH EARLY")&(df[RS_COLS]>0).all(axis=1))|((df.Signal=="BEARISH EARLY")&(df[RS_COLS]<0).all(axis=1)))
     df["Priority"]=np.where(df["RS Aligned"]&(df.Signal!="NO SETUP"),"PRIORITY",np.where(df.Signal!="NO SETUP","ENTRY — RS NOT FULLY ALIGNED","NO SETUP"))
